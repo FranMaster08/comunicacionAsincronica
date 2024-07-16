@@ -1,0 +1,109 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - my_network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_CREATE_TOPICS: "citas:1:1"
+    ports:
+      - "9092:9092"
+    networks:
+      - my_network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "9000:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - zookeeper
+      - kafka
+    networks:
+      - my_network
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: fran
+      MYSQL_DATABASE: citas
+      MYSQL_USER: fran
+      MYSQL_PASSWORD: fran
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - my_network
+
+  executing-front-unidades:
+    build:
+      context: ./micro-front-unidades
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    networks:
+      - my_network
+
+  clinical-station-front:
+    build:
+      context: ./micro-front-clinical-station
+      dockerfile: Dockerfile
+    ports:
+      - "5174:5173"
+    networks:
+      - my_network
+
+  executing-unidades-backend:
+    build:
+      context: ./executing-clinical
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: fran
+      MYSQL_PASSWORD: fran
+      MYSQL_DATABASE: citas
+    depends_on:
+      - mysql
+    networks:
+      - my_network
+
+  clinical-station-backend:
+    build:
+      context: ./clinical-station
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    networks:
+      - my_network
+
+volumes:
+  mysql-data:
+
+networks:
+  my_network:
+    driver: bridge
